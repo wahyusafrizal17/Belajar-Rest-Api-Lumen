@@ -4,8 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Repositories\CategoryRepositoryEloquent;
-use Illuminate\Support\Str;
 use App\Http\Requests\CategoryRequest;
+use App\Service\CategoryService;
+use App\Http\Resources\CategoryResource;
 
 class CategoryController extends Controller
 {
@@ -22,9 +23,14 @@ class CategoryController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $model = $this->categoryRepository->all();
+        if($request->has('type'))
+        {
+            $model = CategoryResource::collection($this->categoryRepository->findWhere(['type' => $request->type]));
+        }else{
+            $model = CategoryResource::collection($this->categoryRepository->all());
+        }
 
         if(!empty($model)){
             $response['success'] = true;
@@ -44,17 +50,9 @@ class CategoryController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(CategoryRequest $request)
+    public function store(CategoryRequest $request, CategoryService $categoryService)
     {
-        $data = $request->all();
-        $data['slug'] = Str::slug($request->name, '-');
-        if($request->hasFile('images')){
-            $file = $request->file('images');
-            $fileName = $file->getClientOriginalName();
-            $file->move('category', $fileName);
-            $data['images'] = $fileName;
-        }
-
+        $data = $categoryService->store($request);
         $model = $this->categoryRepository->create($data);
 
         if($model){
@@ -77,7 +75,7 @@ class CategoryController extends Controller
      */
     public function show($id)
     {
-        $model = $this->categoryRepository->where('id', $id)->first();
+        $model = new CategoryResource($this->categoryRepository->find($id));
 
         if(!empty($model)){
             $response['success'] = true;
@@ -98,20 +96,12 @@ class CategoryController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(CategoryRequest $request, $id)
+    public function update(CategoryRequest $request, $id, CategoryService $categoryService)
     {
         $cek = $this->categoryRepository->where('id', $id)->first();
 
         if($cek){
-            $data = $request->all();
-            $data['slug'] = Str::slug($request->name, '-');
-            if($request->hasFile('images')){
-                $file = $request->file('images');
-                $fileName = $file->getClientOriginalName();
-                $file->move('category', $fileName);
-                $data['images'] = $fileName;
-            }
-
+            $data = $categoryService->update($request);
             $model = $this->categoryRepository->update($data, $id);
 
             if($model){
@@ -123,13 +113,12 @@ class CategoryController extends Controller
                 $response['message'] = "Data gagal di ubah";
             }
 
-            return response()->json($response);
         }else{
             $response['success'] = false;
             $response['message'] = "Data tidak di temukan";
-
-            return response()->json($response);
         }
+
+        return response()->json($response);
     }
 
     /**
